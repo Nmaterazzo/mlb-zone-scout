@@ -1337,166 +1337,182 @@ function computeCountTakeRates() {
 function updateRecommendations(filtered, hotZ, coldZ, takeRate, countTakeRates) {
   const recs = [];
 
-  // ── TAKE RATE ANALYSIS ────────────────────────────────────────────────────
-  // Only surface take insights when they clearly stand out (>= 8pp difference)
-  if (currentCount === 'all') {
-    // Find counts where he takes dramatically more/less than his overall average
-    const overallTake = takeRate;
-    if (overallTake !== null) {
-      const highTakeCounts = [];   // taking a lot — sitting for a pitch
-      const lowTakeCounts  = [];   // hacking early — aggressive counts
+  // ── SHARED: PITCH EFFECTIVENESS ───────────────────────────────────────────
+  const pitchEff = computePitchEffectiveness();
 
+  const bestWhiffPitch = Object.entries(pitchEff)
+    .filter(([,d]) => d.pitches >= 15)
+    .sort((a,b) => b[1].whiffRate - a[1].whiffRate)[0];
+
+  const bestChasePitch = Object.entries(pitchEff)
+    .filter(([,d]) => d.chasePitches >= 10)
+    .sort((a,b) => b[1].chaseRate - a[1].chaseRate)[0];
+
+  const bestContactPitch = Object.entries(pitchEff)
+    .filter(([,d]) => d.avg !== null && d.abs >= 8)
+    .sort((a,b) => a[1].avg - b[1].avg)[0];
+
+  const worsePitch = Object.entries(pitchEff)
+    .filter(([,d]) => d.avg !== null && d.abs >= 8)
+    .sort((a,b) => b[1].avg - a[1].avg)[0];
+
+  let bestChaseZ = null, bestChaseWhiff = 0;
+  [11,12,13,14].forEach(z => {
+    const d = zoneData[z];
+    if (d && d.whiff !== null && d.pitches >= 20 && d.whiff > bestChaseWhiff) {
+      bestChaseWhiff = d.whiff; bestChaseZ = z;
+    }
+  });
+
+  // ── BRANCH: SPECIFIC COUNT = PRESCRIPTIVE 3-LINE PLAN ────────────────────
+  if (currentCount !== 'all') {
+    const thisCountTake = countTakeRates[currentCount];
+    const overallTake = takeRate;
+
+    // ① PRIMARY — what to throw and where
+    // Best pitch = lowest BA against (most reliable) OR highest whiff if no AB data
+    const primaryPitch = bestContactPitch || bestWhiffPitch;
+    const primaryZone  = coldZ;
+
+    if (primaryPitch && primaryZone) {
+      const zd = zoneData[primaryZone];
+      const pitchName = PITCH_LABELS[primaryPitch[0]] || primaryPitch[0];
+      const zoneName  = ZONE_NAMES[primaryZone];
+      const baStat    = zd && zd.avg !== null ? ` (.${Math.round(zd.avg*1000)} BA)` : '';
+      const whiffStat = ` ${(primaryPitch[1].whiffRate*100).toFixed(0)}% whiff rate.`;
+
+      // Take modifier — fold into primary if notable
+      let takeMod = '';
+      if (thisCountTake !== undefined && overallTake !== null) {
+        const diff = thisCountTake - overallTake;
+        if (thisCountTake >= 0.45 && diff >= 0.12) {
+          takeMod = ` Note: he tends to take pitches here (${(thisCountTake*100).toFixed(0)}% take rate) — challenge him early, don't nibble.`;
+        } else if (thisCountTake <= 0.25 && diff <= -0.12) {
+          takeMod = ` He's aggressive this count (${(thisCountTake*100).toFixed(0)}% take rate) — use that against him with something that moves late.`;
+        } else if (currentCount === '3-0' && thisCountTake >= 0.60) {
+          takeMod = ` He's almost certainly taking (${(thisCountTake*100).toFixed(0)}% take rate) — throw a strike, don't waste one.`;
+        }
+      }
+
+      recs.push({
+        color: '#4a9ee8',
+        text: `① <strong>${pitchName} to ${zoneName}</strong>${baStat} —${whiffStat} This is your pitch this count.${takeMod}`
+      });
+    } else if (primaryPitch) {
+      const pitchName = PITCH_LABELS[primaryPitch[0]] || primaryPitch[0];
+      recs.push({
+        color: '#4a9ee8',
+        text: `① <strong>${pitchName}</strong> — ${(primaryPitch[1].whiffRate*100).toFixed(0)}% whiff rate this count. Your best weapon here.`
+      });
+    } else if (primaryZone) {
+      const zd = zoneData[primaryZone];
+      recs.push({
+        color: '#4a9ee8',
+        text: `① <strong>Work ${ZONE_NAMES[primaryZone]}</strong>${zd && zd.avg !== null ? ` (.${Math.round(zd.avg*1000)} BA)` : ''} — his weakest contact zone this count.`
+      });
+    }
+
+    // ② SECONDARY — the chase/setup option if different from primary
+    // Only show if the chase pitch is different from the primary pitch
+    const chasePitchDifferent = bestChasePitch && primaryPitch && bestChasePitch[0] !== primaryPitch[0];
+    const hasChaseOption = bestChaseZ && bestChaseWhiff > 0.25;
+
+    if (hasChaseOption) {
+      const chasePitchStr = (bestChasePitch && chasePitchDifferent)
+        ? ` with the <strong>${PITCH_LABELS[bestChasePitch[0]] || bestChasePitch[0]}</strong> (${(bestChasePitch[1].chaseRate*100).toFixed(0)}% chase rate)`
+        : '';
+      const twoStrikeNote = currentCount.endsWith('-2') ? ' You have the count to go off the plate.' : ' Set it up with the primary first.';
+      recs.push({
+        color: '#ff6600',
+        text: `② <strong>Back door: ${ZONE_NAMES[bestChaseZ]}</strong>${chasePitchStr} — ${(bestChaseWhiff*100).toFixed(0)}% whiff rate in the chase zone.${twoStrikeNote}`
+      });
+    } else if (bestChasePitch && chasePitchDifferent) {
+      // No great chase zone but there's a secondary pitch worth noting
+      recs.push({
+        color: '#ff6600',
+        text: `② <strong>${PITCH_LABELS[bestChasePitch[0]] || bestChasePitch[0]} off the plate</strong> — ${(bestChasePitch[1].chaseRate*100).toFixed(0)}% chase rate. Mix it in to keep him off the primary.`
+      });
+    }
+
+    // ③ AVOID — one clear warning, location + pitch
+    if (hotZ || worsePitch) {
+      const zonePart = hotZ
+        ? `<strong>${ZONE_NAMES[hotZ]}</strong>${zoneData[hotZ]?.avg !== null ? ` (.${Math.round((zoneData[hotZ]?.avg||0)*1000)} BA)` : ''}`
+        : null;
+      const pitchPart = worsePitch
+        ? `<strong>${PITCH_LABELS[worsePitch[0]] || worsePitch[0]}</strong> (.${Math.round(worsePitch[1].avg*1000)} BA against)`
+        : null;
+
+      let avoidText = '③ <strong>Avoid: </strong>';
+      if (zonePart && pitchPart && worsePitch[0] !== (primaryPitch?.[0])) {
+        avoidText += `${pitchPart} to ${zonePart}. That's where he does the most damage.`;
+      } else if (zonePart) {
+        avoidText += `${zonePart} — any mistake here gets punished.`;
+      } else if (pitchPart) {
+        avoidText += `${pitchPart} — he squares this up. Don't leave it over the plate.`;
+      }
+
+      recs.push({ color: '#ff3333', text: avoidText });
+    }
+
+  // ── BRANCH: ALL COUNTS = DESCRIPTIVE TENDENCIES ───────────────────────────
+  } else {
+    const overallTake = takeRate;
+    // Overall tendency — best pitch + zone combo
+    if (coldZ && (bestContactPitch || bestWhiffPitch)) {
+      const p = bestContactPitch || bestWhiffPitch;
+      const pitchName = PITCH_LABELS[p[0]] || p[0];
+      const zd = zoneData[coldZ];
+      recs.push({
+        color: '#4a9ee8',
+        text: `<strong>${pitchName} to ${ZONE_NAMES[coldZ]}</strong> — his weakest zone (.${zd?.avg !== null ? Math.round((zd?.avg||0)*1000) : '—'} BA) paired with his worst pitch (${(p[1].whiffRate*100).toFixed(0)}% whiff). This is the go-to sequence.`
+      });
+    }
+
+    // Chase tendency
+    if (bestChaseZ && bestChaseWhiff > 0.25 && bestChasePitch) {
+      const pitchName = PITCH_LABELS[bestChasePitch[0]] || bestChasePitch[0];
+      recs.push({
+        color: '#ff6600',
+        text: `<strong>${pitchName} to the chase zone</strong> — ${(bestChasePitch[1].chaseRate*100).toFixed(0)}% chase rate when you expand to ${ZONE_NAMES[bestChaseZ]}. Works best after establishing the primary.`
+      });
+    }
+
+    // Damage zone warning
+    if (hotZ && worsePitch) {
+      const pitchName = PITCH_LABELS[worsePitch[0]] || worsePitch[0];
+      recs.push({
+        color: '#ff3333',
+        text: `<strong>Danger: ${pitchName} to ${ZONE_NAMES[hotZ]}</strong> — he hits .${Math.round((worsePitch[1].avg||0)*1000)} against the ${pitchName} and does his most damage in ${ZONE_NAMES[hotZ]}. Never let this combo happen.`
+      });
+    }
+
+    // Take rate tendencies across counts
+    if (overallTake !== null) {
+      const highTakeCounts = [], lowTakeCounts = [];
       Object.entries(countTakeRates).forEach(([cnt, rate]) => {
         const diff = rate - overallTake;
-        if (diff >= 0.18 && rate >= 0.45) highTakeCounts.push({ cnt, rate, diff });
-        if (diff <= -0.18 && rate <= 0.30) lowTakeCounts.push({ cnt, rate, diff });
+        if (diff >= 0.18 && rate >= 0.45) highTakeCounts.push({ cnt, rate });
+        if (diff <= -0.18 && rate <= 0.30) lowTakeCounts.push({ cnt, rate });
       });
-
       highTakeCounts.sort((a,b) => b.rate - a.rate);
       lowTakeCounts.sort((a,b) => a.rate - b.rate);
 
       if (highTakeCounts.length) {
         const top = highTakeCounts.slice(0,3);
-        const cntStr = top.map(c => `${c.cnt} (${(c.rate*100).toFixed(0)}%)`).join(', ');
         recs.push({
           color: '#9b59b6',
-          text: `<strong>Takes pitches in ${top.map(c=>c.cnt).join(', ')}</strong> — In-zone take rate spikes to ${(top[0].rate*100).toFixed(0)}% (vs ${(overallTake*100).toFixed(0)}% overall). He's hunting a specific pitch. Don't throw him a cookie — he'll lay off and make you come back.`
+          text: `<strong>Takes in ${top.map(c=>c.cnt).join(', ')}</strong> — in-zone take rate spikes to ${(top[0].rate*100).toFixed(0)}% vs ${(overallTake*100).toFixed(0)}% overall. He's hunting something specific. Don't groove one.`
         });
       }
-
       if (lowTakeCounts.length) {
         const top = lowTakeCounts.slice(0,2);
         recs.push({
           color: '#2ecc71',
-          text: `<strong>Hacks early in ${top.map(c=>c.cnt).join(', ')}</strong> — Take rate drops to ${(top[0].rate*100).toFixed(0)}% in these counts. He's not waiting. You can exploit this with off-speed early in the at-bat.`
+          text: `<strong>Hacks in ${top.map(c=>c.cnt).join(', ')}</strong> — take rate drops to ${(top[0].rate*100).toFixed(0)}%. He's not patient here. Use early off-speed to exploit it.`
         });
       }
     }
-  } else {
-    // Specific count selected — show take insight if it stands out vs overall
-    const overallTake = takeRate;
-    const thisCountRate = countTakeRates[currentCount];
-
-    if (overallTake !== null && thisCountRate !== undefined) {
-      const diff = thisCountRate - overallTake;
-      if (thisCountRate >= 0.45 && diff >= 0.12) {
-        recs.push({
-          color: '#9b59b6',
-          text: `<strong>High take rate this count (${(thisCountRate*100).toFixed(0)}%)</strong> — He takes in-zone pitches at an unusually high rate here. He's being selective, waiting for his pitch. Don't groove one — work the edges or waste a pitch.`
-        });
-      } else if (thisCountRate <= 0.25 && diff <= -0.12) {
-        recs.push({
-          color: '#2ecc71',
-          text: `<strong>Very aggressive this count (${(thisCountRate*100).toFixed(0)}% take rate)</strong> — He's not taking pitches. Get ahead with something that looks good early and fades — he'll chase.`
-        });
-      }
-    }
-
-    // 3-0 special case — almost everyone takes here
-    if (currentCount === '3-0' && thisCountRate !== undefined && thisCountRate >= 0.60) {
-      recs.push({
-        color: '#9b59b6',
-        text: `<strong>3-0: almost certainly taking</strong> — ${(thisCountRate*100).toFixed(0)}% in-zone take rate. Unless he has a green light, he's not swinging. Throw a strike but don't give him anything to drive on 3-1.`
-      });
-    }
-  }
-
-  // ── PITCH EFFECTIVENESS ───────────────────────────────────────────────────
-  const pitchEff = computePitchEffectiveness();
-
-  // Best whiff pitch overall
-  const bestWhiffPitch = Object.entries(pitchEff)
-    .filter(([,d]) => d.pitches >= 15)
-    .sort((a,b) => b[1].whiffRate - a[1].whiffRate)[0];
-
-  // Best chase pitch (highest chase rate)
-  const bestChasePitch = Object.entries(pitchEff)
-    .filter(([,d]) => d.chasePitches >= 10)
-    .sort((a,b) => b[1].chaseRate - a[1].chaseRate)[0];
-
-  // Worst contact pitch (lowest BA against, min 8 ABs)
-  const bestContactPitch = Object.entries(pitchEff)
-    .filter(([,d]) => d.avg !== null && d.abs >= 8)
-    .sort((a,b) => a[1].avg - b[1].avg)[0];
-
-  // Pitch he handles best (avoid)
-  const worsePitch = Object.entries(pitchEff)
-    .filter(([,d]) => d.avg !== null && d.abs >= 8)
-    .sort((a,b) => b[1].avg - a[1].avg)[0];
-  let bestChaseZ = null, bestChaseWhiff = 0;
-  [11,12,13,14].forEach(z => {
-    const d = zoneData[z];
-    if (d && d.whiff !== null && d.pitches >= 5 && d.whiff > bestChaseWhiff) {
-      bestChaseWhiff = d.whiff; bestChaseZ = z;
-    }
-  });
-
-  // Primary weapon — best pitch to coldest zone
-  if (coldZ) {
-    const d = zoneData[coldZ];
-    const pitchHint = bestContactPitch
-      ? ` Use the <strong>${PITCH_LABELS[bestContactPitch[0]] || bestContactPitch[0]}</strong> here — he hits it at only .${Math.round(bestContactPitch[1].avg*1000)} BA.`
-      : bestWhiffPitch
-        ? ` Lead with the <strong>${PITCH_LABELS[bestWhiffPitch[0]] || bestWhiffPitch[0]}</strong> — highest whiff pitch (${(bestWhiffPitch[1].whiffRate*100).toFixed(0)}% whiff rate).`
-        : '';
-    recs.push({
-      color: '#4a9ee8',
-      text: `<strong>Work ${ZONE_NAMES[coldZ]} (Zone ${coldZ})</strong> — His weakest contact zone${d.avg !== null ? ` (.${Math.round(d.avg*1000)} BA)` : ''}.${pitchHint}`
-    });
-  }
-
-  // Chase setup with best chase pitch
-  if (bestChaseZ && bestChaseWhiff > 0.25) {
-    const chasePitchHint = bestChasePitch
-      ? ` Best chase pitch: <strong>${PITCH_LABELS[bestChasePitch[0]] || bestChasePitch[0]}</strong> — ${(bestChasePitch[1].chaseRate*100).toFixed(0)}% chase rate.`
-      : '';
-    recs.push({
-      color: '#ff6600',
-      text: `<strong>Expand to ${ZONE_NAMES[bestChaseZ]}</strong> — Chase zone with ${(bestChaseWhiff*100).toFixed(0)}% whiff rate. Set it up with something in the zone first.${chasePitchHint}`
-    });
-  }
-
-  // Danger zone with worst pitch to throw there
-  if (hotZ) {
-    const d = zoneData[hotZ];
-    const avoidHint = worsePitch
-      ? ` Especially the <strong>${PITCH_LABELS[worsePitch[0]] || worsePitch[0]}</strong> (.${Math.round(worsePitch[1].avg*1000)} BA) — keep it out of this zone.`
-      : '';
-    recs.push({
-      color: '#ff3333',
-      text: `<strong>Avoid ${ZONE_NAMES[hotZ]} (Zone ${hotZ})</strong> — He does the most damage here${d.avg !== null ? ` (.${Math.round(d.avg*1000)} BA)` : ''}.${avoidHint}`
-    });
-  }
-
-  // Best overall whiff pitch if not already surfaced
-  if (bestWhiffPitch && bestWhiffPitch[1].whiffRate > 0.30) {
-    const alreadyMentioned = bestContactPitch && bestContactPitch[0] === bestWhiffPitch[0];
-    if (!alreadyMentioned) {
-      recs.push({
-        color: '#e8c84a',
-        text: `<strong>${PITCH_LABELS[bestWhiffPitch[0]] || bestWhiffPitch[0]} is his weakness</strong> — ${(bestWhiffPitch[1].whiffRate*100).toFixed(0)}% whiff rate this filter. Use it to expand or put him away.`
-      });
-    }
-  }
-
-  // Two-strike specific
-  if (currentCount !== 'all' && currentCount.endsWith('-2')) {
-    const finishPitch = bestWhiffPitch || bestChasePitch;
-    const pitchStr = finishPitch ? ` Reach for the <strong>${PITCH_LABELS[finishPitch[0]] || finishPitch[0]}</strong>.` : '';
-    if (bestChaseZ) {
-      recs.push({
-        color: '#aaaaaa',
-        text: `<strong>Two-strike: go for the chase</strong> — ${ZONE_NAMES[bestChaseZ]} expanded zone gets swings and misses. Don't be afraid to go off the plate.${pitchStr}`
-      });
-    }
-  }
-
-  // Hitter's count specific
-  if (['3-1','2-0'].includes(currentCount)) {
-    recs.push({
-      color: '#e8c84a',
-      text: `<strong>Hitter's count — be careful</strong> — He's sitting fastball. Only throw quality strikes at the edges. Don't groove one.`
-    });
   }
 
   if (!recs.length) {
