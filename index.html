@@ -399,6 +399,102 @@
 
   .footer-note { margin-top: 24px; font-size: 0.72rem; color: var(--muted); text-align: center; letter-spacing: 0.04em; }
 
+  /* Season checkbox dropdown */
+  .season-dropdown-wrap { position: relative; }
+
+  .season-trigger {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Barlow', sans-serif;
+    font-size: 0.88rem;
+    padding: 8px 32px 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    outline: none;
+    min-width: 130px;
+    text-align: left;
+    position: relative;
+    transition: border-color 0.15s;
+    white-space: nowrap;
+  }
+
+  .season-trigger:hover, .season-trigger.open { border-color: var(--accent); }
+
+  .season-trigger::after {
+    content: '▾';
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    font-size: 0.75rem;
+    transition: transform 0.15s;
+  }
+
+  .season-trigger.open::after { transform: translateY(-50%) rotate(180deg); }
+
+  .season-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 0;
+    z-index: 200;
+    min-width: 160px;
+    display: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+
+  .season-menu.open { display: block; }
+
+  .season-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.1s;
+    user-select: none;
+  }
+
+  .season-menu-item:hover { background: rgba(232,200,74,0.08); }
+
+  .season-menu-item input[type=checkbox] {
+    appearance: none;
+    width: 15px;
+    height: 15px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--bg);
+    cursor: pointer;
+    position: relative;
+    flex-shrink: 0;
+    transition: all 0.1s;
+  }
+
+  .season-menu-item input[type=checkbox]:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .season-menu-item input[type=checkbox]:checked::after {
+    content: '✓';
+    position: absolute;
+    top: -1px;
+    left: 2px;
+    font-size: 11px;
+    color: #000;
+    font-weight: 700;
+  }
+
+  .season-menu-item .season-label { color: var(--text); }
+  .season-menu-item.all-item { border-bottom: 1px solid var(--border); margin-bottom: 3px; }
+  .season-menu-item.all-item .season-label { color: var(--accent); font-weight: 600; }
+
   /* Scrollbar */
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
@@ -435,13 +531,44 @@
 <!-- CONTROLS -->
 <div class="controls" id="controls" style="display:none;">
   <div class="ctrl-group">
-    <label>Season</label>
-    <select id="seasonSelect" onchange="reloadPlayer()">
-      <option value="2025">2025</option>
-      <option value="2024" selected>2024</option>
-      <option value="2023">2023</option>
-      <option value="2022">2022</option>
-    </select>
+    <label>Season(s)</label>
+    <div class="season-dropdown-wrap">
+      <button class="season-trigger" id="seasonTrigger" onclick="toggleSeasonMenu()">2024</button>
+      <div class="season-menu" id="seasonMenu">
+        <div class="season-menu-item all-item" onclick="toggleAllSeasons()">
+          <input type="checkbox" id="chk-all" />
+          <span class="season-label">All Seasons</span>
+        </div>
+        <div class="season-menu-item" onclick="toggleSeason('2025',this)">
+          <input type="checkbox" id="chk-2025" />
+          <span class="season-label">2025</span>
+        </div>
+        <div class="season-menu-item" onclick="toggleSeason('2024',this)">
+          <input type="checkbox" id="chk-2024" checked />
+          <span class="season-label">2024</span>
+        </div>
+        <div class="season-menu-item" onclick="toggleSeason('2023',this)">
+          <input type="checkbox" id="chk-2023" />
+          <span class="season-label">2023</span>
+        </div>
+        <div class="season-menu-item" onclick="toggleSeason('2022',this)">
+          <input type="checkbox" id="chk-2022" />
+          <span class="season-label">2022</span>
+        </div>
+        <div class="season-menu-item" onclick="toggleSeason('2021',this)">
+          <input type="checkbox" id="chk-2021" />
+          <span class="season-label">2021</span>
+        </div>
+        <div class="season-menu-item" onclick="toggleSeason('2020',this)">
+          <input type="checkbox" id="chk-2020" />
+          <span class="season-label">2020</span>
+        </div>
+        <div class="season-menu-item" onclick="toggleSeason('2019',this)">
+          <input type="checkbox" id="chk-2019" />
+          <span class="season-label">2019</span>
+        </div>
+      </div>
+    </div>
   </div>
   <div class="ctrl-group">
     <label>Metric</label>
@@ -454,16 +581,17 @@
   </div>
   <div class="ctrl-group">
     <label>Pitch Type</label>
-    <select id="pitchTypeSelect" onchange="updateAll()">
+    <select id="pitchTypeSelect" onchange="currentPitchType=this.value;updateAll()">
       <option value="all">All Pitches</option>
       <option value="FF">4-Seam FB</option>
       <option value="SI">Sinker</option>
       <option value="FC">Cutter</option>
       <option value="SL">Slider</option>
-      <option value="SW">Sweeper</option>
+      <option value="ST">Sweeper</option>
       <option value="CU">Curveball</option>
       <option value="CH">Changeup</option>
       <option value="FS">Splitter</option>
+      <option value="KC">Knuckle-Curve</option>
     </select>
   </div>
   <div class="ctrl-group">
@@ -508,6 +636,7 @@
       <div class="stat-row"><span class="label">Overall BA</span><span class="val" id="stat-ba">—</span></div>
       <div class="stat-row"><span class="label">Chase Rate</span><span class="val" id="stat-chase">—</span></div>
       <div class="stat-row"><span class="label">Whiff%</span><span class="val" id="stat-whiff">—</span></div>
+      <div class="stat-row"><span class="label">Take Rate (in zone)</span><span class="val" id="stat-take">—</span></div>
       <div class="stat-row"><span class="label">Hard Hit%</span><span class="val" id="stat-hard">—</span></div>
       <div class="stat-row"><span class="label">Pitches (this filter)</span><span class="val" id="stat-pitches">—</span></div>
     </div>
@@ -533,6 +662,7 @@
 const PROXY = 'https://mlb-proxy.nmaterazzo2435.workers.dev/';
 
 // ─── STATE ───────────────────────────────────────────────────────────────────
+let selectedSeasons = ['2024']; // array of selected seasons
 let allPlayers = [];
 let currentPlayer = null;
 let rawPitches = []; // parsed CSV rows
@@ -553,20 +683,20 @@ const ZONE_NAMES = {
 
 const PITCH_COLORS = {
   FF:'#e8524a', SI:'#e8844a', FC:'#c8a84a',
-  SL:'#4a9ee8', SW:'#4acce8', CU:'#9e4ae8',
-  CH:'#4ae87a', FS:'#e84a9e', KC:'#7ae84a', CS:'#e8e84a'
+  SL:'#4a9ee8', ST:'#4acce8', CU:'#9e4ae8',
+  CH:'#4ae87a', FS:'#e84a9e', KC:'#7ae84a', CS:'#e8e84a', SW:'#4acce8'
 };
 
 const PITCH_LABELS = {
   FF:'4-Seam FB', SI:'Sinker', FC:'Cutter', SL:'Slider',
-  SW:'Sweeper', CU:'Curveball', CH:'Changeup', FS:'Splitter',
-  KC:'Knuckle-Curve', CS:'Slow Curve', ST:'Sweeper', FA:'Fastball'
+  ST:'Sweeper', SW:'Sweeper', CU:'Curveball', CH:'Changeup', FS:'Splitter',
+  KC:'Knuckle-Curve', CS:'Slow Curve', FA:'Fastball'
 };
 
 // ─── LOAD PLAYERS ────────────────────────────────────────────────────────────
 async function loadPlayers() {
   try {
-    const season = document.getElementById('seasonSelect')?.value || '2024';
+    const season = selectedSeasons[selectedSeasons.length - 1] || '2024';
     const url = encodeURIComponent(`https://statsapi.mlb.com/api/v1/sports/1/players?season=${season}&gameType=R`);
     const res = await fetch(`${PROXY}?url=${url}`);
     const json = await res.json();
@@ -621,38 +751,51 @@ document.addEventListener('click', e => {
 // ─── LOAD PLAYER DATA ────────────────────────────────────────────────────────
 async function loadPlayerData() {
   if (!currentPlayer) return;
-  const season = document.getElementById('seasonSelect').value;
+  if (!selectedSeasons.length) { showError('Please select at least one season.'); return; }
+
+  const seasonsLabel = selectedSeasons.length === 1 ? `${selectedSeasons[0]} Season` : `${selectedSeasons.join(', ')} Combined`;
 
   showLoading('Fetching Statcast data from Baseball Savant...', 10);
   hideError();
   document.getElementById('controls').style.display = 'none';
   document.getElementById('mainContent').style.display = 'none';
 
-  // Update player bar
   document.getElementById('playerBar').innerHTML = `
     <div class="player-info">
       <h2>${currentPlayer.name}</h2>
-      <div class="meta">${currentPlayer.position} <span>·</span> ${currentPlayer.team} <span>·</span> Bats: ${currentPlayer.bats} <span>·</span> ${season} Season</div>
+      <div class="meta">${currentPlayer.position} <span>·</span> ${currentPlayer.team} <span>·</span> Bats: ${currentPlayer.bats} <span>·</span> ${seasonsLabel}</div>
     </div>
   `;
 
   try {
-    setProgress(25);
-    showLoading('Downloading pitch-by-pitch data...');
+    setProgress(20);
+    showLoading(`Fetching ${selectedSeasons.length > 1 ? selectedSeasons.length + ' seasons' : selectedSeasons[0]} from Baseball Savant...`);
 
-    const savantUrl = `https://baseballsavant.mlb.com/statcast_search/csv?player_id=${currentPlayer.id}&player_type=batter&season=${season}&type=details&hfGT=R%7C&min_pitches=0&min_results=0&group_by=name&sort_col=pitches&sort_order=desc&min_pas=0`;
-    const proxyUrl = `${PROXY}?url=${encodeURIComponent(savantUrl)}`;
+    // Fetch all seasons in parallel
+    const fetchSeason = async (season) => {
+      const savantUrl = `https://baseballsavant.mlb.com/statcast_search/csv?player_id=${currentPlayer.id}&player_type=batter&season=${season}&type=details&hfGT=R%7C&min_pitches=0&min_results=0&group_by=name&sort_col=pitches&sort_order=desc&min_pas=0`;
+      const res = await fetch(`${PROXY}?url=${encodeURIComponent(savantUrl)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status} for ${season}`);
+      return res.text();
+    };
 
-    const res = await fetch(proxyUrl);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const results = await Promise.all(selectedSeasons.map(fetchSeason));
 
-    setProgress(60);
+    setProgress(65);
     showLoading('Parsing pitch data...');
 
-    const text = await res.text();
-    rawPitches = parseCSV(text);
+    // Parse and merge all seasons
+    let allPitches = [];
+    results.forEach((text, i) => {
+      const parsed = parseCSV(text);
+      // Tag each pitch with its season
+      parsed.forEach(p => { p._season = selectedSeasons[i]; });
+      allPitches = allPitches.concat(parsed);
+    });
 
-    if (!rawPitches.length) throw new Error('No pitch data found for this player/season');
+    rawPitches = allPitches;
+
+    if (!rawPitches.length) throw new Error('No pitch data found for this player/season selection');
 
     setProgress(85);
     showLoading('Building zone heat map...');
@@ -674,7 +817,7 @@ async function loadPlayerData() {
 
     document.getElementById('controls').style.display = 'flex';
     document.getElementById('mainContent').style.display = 'flex';
-    document.getElementById('footerNote').textContent = `${rawPitches.length.toLocaleString()} pitches loaded · ${season} Regular Season · Baseball Savant`;
+    document.getElementById('footerNote').textContent = `${rawPitches.length.toLocaleString()} pitches loaded · ${seasonsLabel} · Baseball Savant`;
 
     updateAll();
 
@@ -1074,9 +1217,19 @@ function updateSidePanel() {
   const hardHit = batted.filter(p => p._isHardHit).length;
   const hardHitRate = batted.length > 0 ? ((hardHit/batted.length)*100).toFixed(1)+'%' : '—';
 
+  // Take rate — pitches seen in the strike zone that were NOT swung at
+  const inZonePitches = filtered.filter(p => p._zone >= 1 && p._zone <= 9);
+  const inZoneTakes = inZonePitches.filter(p => !p._isSwing).length;
+  const takeRate = inZonePitches.length > 0 ? (inZoneTakes / inZonePitches.length) : null;
+  const takeRateStr = takeRate !== null ? (takeRate*100).toFixed(1)+'%' : '—';
+
+  // Per-count take rates for comparison (use all pitches unfiltered by count)
+  const countTakeRates = computeCountTakeRates();
+
   document.getElementById('stat-ba').textContent = ba;
   document.getElementById('stat-chase').textContent = chaseRate;
   document.getElementById('stat-whiff').textContent = whiffRate;
+  document.getElementById('stat-take').textContent = takeRateStr;
   document.getElementById('stat-hard').textContent = hardHitRate;
   document.getElementById('stat-pitches').textContent = totalPitches.toLocaleString();
 
@@ -1104,7 +1257,7 @@ function updateSidePanel() {
   }
 
   // Attack recommendations — generated from actual data
-  updateRecommendations(filtered, hotZ, coldZ);
+  updateRecommendations(filtered, hotZ, coldZ, takeRate, countTakeRates);
 
   // Zone title
   const metricLabels = { avg:'Batting Average', slg:'Slugging %', whiff:'Whiff %', xwoba:'xwOBA' };
@@ -1113,10 +1266,163 @@ function updateSidePanel() {
   document.getElementById('zoneTitle').textContent = `${label} · ${metricLabels[currentMetric]} · ${pitchLabel} · ${handLabel}`;
 }
 
-function updateRecommendations(filtered, hotZ, coldZ) {
+// ─── PITCH EFFECTIVENESS BY ZONE ─────────────────────────────────────────────
+// Returns the best pitch type to throw to coldZ and the best chase pitch,
+// computed from actual data for this count/hand filter (ignoring pitch type filter
+// so we always compare across all pitch types)
+function computePitchEffectiveness() {
+  const pitchTypes = {};
+
+  // Use count + hand filter but NOT pitch type filter
+  const base = rawPitches.filter(p => {
+    if (currentCount !== 'all' && p._count !== currentCount) return false;
+    if (currentHand !== 'all' && p.p_throws !== currentHand) return false;
+    return true;
+  });
+
+  base.forEach(p => {
+    const pt = p.pitch_type;
+    if (!pt || pt === 'UN') return;
+    if (!pitchTypes[pt]) pitchTypes[pt] = { swings:0, whiffs:0, hits:0, abs:0, chaseSwings:0, chasePitches:0, pitches:0 };
+    const d = pitchTypes[pt];
+    d.pitches++;
+    if (p._isSwing) d.swings++;
+    if (p._isWhiff) d.whiffs++;
+    if (p._isHit || p._isOut) {
+      d.abs++;
+      if (p._isHit) d.hits++;
+    }
+    if (p._zone >= 11) {
+      d.chasePitches++;
+      if (p._isSwing) d.chaseSwings++;
+    }
+  });
+
+  // Compute rates, require min 15 pitches
+  const results = {};
+  Object.entries(pitchTypes).forEach(([pt, d]) => {
+    if (d.pitches < 15) return;
+    results[pt] = {
+      whiffRate: d.swings > 0 ? d.whiffs / d.swings : 0,
+      avg: d.abs > 0 ? d.hits / d.abs : null,
+      chaseRate: d.chasePitches > 0 ? d.chaseSwings / d.chasePitches : 0,
+      pitches: d.pitches
+    };
+  });
+
+  return results;
+}
+
+// ─── COUNT TAKE RATES ────────────────────────────────────────────────────────
+// Computes in-zone take rate for every count across all raw pitches (ignoring
+// pitch type / hand filters so we always have enough sample)
+function computeCountTakeRates() {
+  const counts = ['0-0','0-1','0-2','1-0','1-1','1-2','2-0','2-1','2-2','3-0','3-1','3-2'];
+  const result = {};
+  counts.forEach(cnt => {
+    const pitches = rawPitches.filter(p =>
+      p._count === cnt &&
+      p._zone >= 1 && p._zone <= 9 &&
+      (currentHand === 'all' || p.p_throws === currentHand) &&
+      (currentPitchType === 'all' || p.pitch_type === currentPitchType)
+    );
+    if (pitches.length >= 15) {
+      const takes = pitches.filter(p => !p._isSwing).length;
+      result[cnt] = takes / pitches.length;
+    }
+  });
+  return result;
+}
+
+function updateRecommendations(filtered, hotZ, coldZ, takeRate, countTakeRates) {
   const recs = [];
 
-  // Find best chase zone (highest whiff in chase zones)
+  // ── TAKE RATE ANALYSIS ────────────────────────────────────────────────────
+  // Only surface take insights when they clearly stand out (>= 8pp difference)
+  if (currentCount === 'all') {
+    // Find counts where he takes dramatically more/less than his overall average
+    const overallTake = takeRate;
+    if (overallTake !== null) {
+      const highTakeCounts = [];   // taking a lot — sitting for a pitch
+      const lowTakeCounts  = [];   // hacking early — aggressive counts
+
+      Object.entries(countTakeRates).forEach(([cnt, rate]) => {
+        const diff = rate - overallTake;
+        if (diff >= 0.18 && rate >= 0.45) highTakeCounts.push({ cnt, rate, diff });
+        if (diff <= -0.18 && rate <= 0.30) lowTakeCounts.push({ cnt, rate, diff });
+      });
+
+      highTakeCounts.sort((a,b) => b.rate - a.rate);
+      lowTakeCounts.sort((a,b) => a.rate - b.rate);
+
+      if (highTakeCounts.length) {
+        const top = highTakeCounts.slice(0,3);
+        const cntStr = top.map(c => `${c.cnt} (${(c.rate*100).toFixed(0)}%)`).join(', ');
+        recs.push({
+          color: '#9b59b6',
+          text: `<strong>Takes pitches in ${top.map(c=>c.cnt).join(', ')}</strong> — In-zone take rate spikes to ${(top[0].rate*100).toFixed(0)}% (vs ${(overallTake*100).toFixed(0)}% overall). He's hunting a specific pitch. Don't throw him a cookie — he'll lay off and make you come back.`
+        });
+      }
+
+      if (lowTakeCounts.length) {
+        const top = lowTakeCounts.slice(0,2);
+        recs.push({
+          color: '#2ecc71',
+          text: `<strong>Hacks early in ${top.map(c=>c.cnt).join(', ')}</strong> — Take rate drops to ${(top[0].rate*100).toFixed(0)}% in these counts. He's not waiting. You can exploit this with off-speed early in the at-bat.`
+        });
+      }
+    }
+  } else {
+    // Specific count selected — show take insight if it stands out vs overall
+    const overallTake = takeRate;
+    const thisCountRate = countTakeRates[currentCount];
+
+    if (overallTake !== null && thisCountRate !== undefined) {
+      const diff = thisCountRate - overallTake;
+      if (thisCountRate >= 0.45 && diff >= 0.12) {
+        recs.push({
+          color: '#9b59b6',
+          text: `<strong>High take rate this count (${(thisCountRate*100).toFixed(0)}%)</strong> — He takes in-zone pitches at an unusually high rate here. He's being selective, waiting for his pitch. Don't groove one — work the edges or waste a pitch.`
+        });
+      } else if (thisCountRate <= 0.25 && diff <= -0.12) {
+        recs.push({
+          color: '#2ecc71',
+          text: `<strong>Very aggressive this count (${(thisCountRate*100).toFixed(0)}% take rate)</strong> — He's not taking pitches. Get ahead with something that looks good early and fades — he'll chase.`
+        });
+      }
+    }
+
+    // 3-0 special case — almost everyone takes here
+    if (currentCount === '3-0' && thisCountRate !== undefined && thisCountRate >= 0.60) {
+      recs.push({
+        color: '#9b59b6',
+        text: `<strong>3-0: almost certainly taking</strong> — ${(thisCountRate*100).toFixed(0)}% in-zone take rate. Unless he has a green light, he's not swinging. Throw a strike but don't give him anything to drive on 3-1.`
+      });
+    }
+  }
+
+  // ── PITCH EFFECTIVENESS ───────────────────────────────────────────────────
+  const pitchEff = computePitchEffectiveness();
+
+  // Best whiff pitch overall
+  const bestWhiffPitch = Object.entries(pitchEff)
+    .filter(([,d]) => d.pitches >= 15)
+    .sort((a,b) => b[1].whiffRate - a[1].whiffRate)[0];
+
+  // Best chase pitch (highest chase rate)
+  const bestChasePitch = Object.entries(pitchEff)
+    .filter(([,d]) => d.chasePitches >= 10)
+    .sort((a,b) => b[1].chaseRate - a[1].chaseRate)[0];
+
+  // Worst contact pitch (lowest BA against, min 8 ABs)
+  const bestContactPitch = Object.entries(pitchEff)
+    .filter(([,d]) => d.avg !== null && d.abs >= 8)
+    .sort((a,b) => a[1].avg - b[1].avg)[0];
+
+  // Pitch he handles best (avoid)
+  const worsePitch = Object.entries(pitchEff)
+    .filter(([,d]) => d.avg !== null && d.abs >= 8)
+    .sort((a,b) => b[1].avg - a[1].avg)[0];
   let bestChaseZ = null, bestChaseWhiff = 0;
   [11,12,13,14].forEach(z => {
     const d = zoneData[z];
@@ -1125,44 +1431,71 @@ function updateRecommendations(filtered, hotZ, coldZ) {
     }
   });
 
+  // Primary weapon — best pitch to coldest zone
   if (coldZ) {
     const d = zoneData[coldZ];
+    const pitchHint = bestContactPitch
+      ? ` Use the <strong>${PITCH_LABELS[bestContactPitch[0]] || bestContactPitch[0]}</strong> here — he hits it at only .${Math.round(bestContactPitch[1].avg*1000)} BA.`
+      : bestWhiffPitch
+        ? ` Lead with the <strong>${PITCH_LABELS[bestWhiffPitch[0]] || bestWhiffPitch[0]}</strong> — highest whiff pitch (${(bestWhiffPitch[1].whiffRate*100).toFixed(0)}% whiff rate).`
+        : '';
     recs.push({
       color: '#4a9ee8',
-      text: `<strong>Work ${ZONE_NAMES[coldZ]} (Zone ${coldZ})</strong> — His weakest contact zone${d.avg !== null ? ` (.${Math.round(d.avg*1000)} BA)` : ''}. This is your primary target.`
+      text: `<strong>Work ${ZONE_NAMES[coldZ]} (Zone ${coldZ})</strong> — His weakest contact zone${d.avg !== null ? ` (.${Math.round(d.avg*1000)} BA)` : ''}.${pitchHint}`
     });
   }
 
+  // Chase setup with best chase pitch
   if (bestChaseZ && bestChaseWhiff > 0.25) {
+    const chasePitchHint = bestChasePitch
+      ? ` Best chase pitch: <strong>${PITCH_LABELS[bestChasePitch[0]] || bestChasePitch[0]}</strong> — ${(bestChasePitch[1].chaseRate*100).toFixed(0)}% chase rate.`
+      : '';
     recs.push({
       color: '#ff6600',
-      text: `<strong>Expand to ${ZONE_NAMES[bestChaseZ]}</strong> — Chase zone with ${(bestChaseWhiff*100).toFixed(0)}% whiff rate. Set it up with something in the zone first.`
+      text: `<strong>Expand to ${ZONE_NAMES[bestChaseZ]}</strong> — Chase zone with ${(bestChaseWhiff*100).toFixed(0)}% whiff rate. Set it up with something in the zone first.${chasePitchHint}`
     });
   }
 
+  // Danger zone with worst pitch to throw there
   if (hotZ) {
     const d = zoneData[hotZ];
+    const avoidHint = worsePitch
+      ? ` Especially the <strong>${PITCH_LABELS[worsePitch[0]] || worsePitch[0]}</strong> (.${Math.round(worsePitch[1].avg*1000)} BA) — keep it out of this zone.`
+      : '';
     recs.push({
       color: '#ff3333',
-      text: `<strong>Avoid ${ZONE_NAMES[hotZ]} (Zone ${hotZ})</strong> — He does the most damage here${d.avg !== null ? ` (.${Math.round(d.avg*1000)} BA)` : ''}. Never leave a mistake in this area.`
+      text: `<strong>Avoid ${ZONE_NAMES[hotZ]} (Zone ${hotZ})</strong> — He does the most damage here${d.avg !== null ? ` (.${Math.round(d.avg*1000)} BA)` : ''}.${avoidHint}`
     });
+  }
+
+  // Best overall whiff pitch if not already surfaced
+  if (bestWhiffPitch && bestWhiffPitch[1].whiffRate > 0.30) {
+    const alreadyMentioned = bestContactPitch && bestContactPitch[0] === bestWhiffPitch[0];
+    if (!alreadyMentioned) {
+      recs.push({
+        color: '#e8c84a',
+        text: `<strong>${PITCH_LABELS[bestWhiffPitch[0]] || bestWhiffPitch[0]} is his weakness</strong> — ${(bestWhiffPitch[1].whiffRate*100).toFixed(0)}% whiff rate this filter. Use it to expand or put him away.`
+      });
+    }
   }
 
   // Two-strike specific
-  if (currentCount === 'all' || currentCount.endsWith('-2')) {
+  if (currentCount !== 'all' && currentCount.endsWith('-2')) {
+    const finishPitch = bestWhiffPitch || bestChasePitch;
+    const pitchStr = finishPitch ? ` Reach for the <strong>${PITCH_LABELS[finishPitch[0]] || finishPitch[0]}</strong>.` : '';
     if (bestChaseZ) {
       recs.push({
         color: '#aaaaaa',
-        text: `<strong>Two-strike: go for the chase</strong> — ${ZONE_NAMES[bestChaseZ]} expanded zone gets swings and misses. Don't be afraid to go off the plate.`
+        text: `<strong>Two-strike: go for the chase</strong> — ${ZONE_NAMES[bestChaseZ]} expanded zone gets swings and misses. Don't be afraid to go off the plate.${pitchStr}`
       });
     }
   }
 
   // Hitter's count specific
-  if (['3-1','2-0','3-0'].includes(currentCount)) {
+  if (['3-1','2-0'].includes(currentCount)) {
     recs.push({
       color: '#e8c84a',
-      text: `<strong>Hitter's count — be careful</strong> — He's sitting fastball and knows it. Only throw quality strikes at the edges. Don't groove one.`
+      text: `<strong>Hitter's count — be careful</strong> — He's sitting fastball. Only throw quality strikes at the edges. Don't groove one.`
     });
   }
 
@@ -1231,6 +1564,102 @@ function showError(msg) {
 function hideError() {
   document.getElementById('errorBar').classList.remove('show');
 }
+
+// ─── SEASON CHECKBOX DROPDOWN ────────────────────────────────────────────────
+const ALL_SEASONS = ['2025','2024','2023','2022','2021','2020','2019'];
+
+function toggleSeasonMenu() {
+  const menu = document.getElementById('seasonMenu');
+  const trigger = document.getElementById('seasonTrigger');
+  const isOpen = menu.classList.contains('open');
+  menu.classList.toggle('open', !isOpen);
+  trigger.classList.toggle('open', !isOpen);
+}
+
+// Close when clicking outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('.season-dropdown-wrap')) {
+    document.getElementById('seasonMenu').classList.remove('open');
+    document.getElementById('seasonTrigger').classList.remove('open');
+  }
+});
+
+function toggleSeason(season, itemEl) {
+  // Don't bubble to parent
+  const chk = document.getElementById(`chk-${season}`);
+  // If click came from checkbox itself, it already toggled — sync from checkbox
+  const isChecked = chk.checked;
+
+  if (isChecked) {
+    if (!selectedSeasons.includes(season)) selectedSeasons.push(season);
+  } else {
+    selectedSeasons = selectedSeasons.filter(s => s !== season);
+    if (!selectedSeasons.length) {
+      // Re-check this one, can't have zero
+      chk.checked = true;
+      selectedSeasons = [season];
+    }
+  }
+
+  syncAllCheckbox();
+  updateSeasonTriggerLabel();
+  reloadPlayer();
+}
+
+function toggleAllSeasons() {
+  const allChk = document.getElementById('chk-all');
+  if (allChk.checked) {
+    // Deselect all — revert to just current year
+    selectedSeasons = ['2024'];
+    ALL_SEASONS.forEach(s => {
+      document.getElementById(`chk-${s}`).checked = s === '2024';
+    });
+    allChk.checked = false;
+  } else {
+    // Select all
+    selectedSeasons = [...ALL_SEASONS];
+    ALL_SEASONS.forEach(s => {
+      document.getElementById(`chk-${s}`).checked = true;
+    });
+    allChk.checked = true;
+  }
+  updateSeasonTriggerLabel();
+  reloadPlayer();
+}
+
+function syncAllCheckbox() {
+  const allChk = document.getElementById('chk-all');
+  allChk.checked = selectedSeasons.length === ALL_SEASONS.length;
+}
+
+function updateSeasonTriggerLabel() {
+  const trigger = document.getElementById('seasonTrigger');
+  if (selectedSeasons.length === ALL_SEASONS.length) {
+    trigger.textContent = 'All Seasons';
+  } else if (selectedSeasons.length === 1) {
+    trigger.textContent = selectedSeasons[0];
+  } else {
+    // Sort descending for display
+    const sorted = [...selectedSeasons].sort((a,b) => b-a);
+    trigger.textContent = sorted.join(', ');
+  }
+}
+
+// Wire up checkboxes so clicking the checkbox itself also works
+ALL_SEASONS.forEach(season => {
+  const chk = document.getElementById(`chk-${season}`);
+  if (chk) {
+    chk.addEventListener('change', (e) => {
+      e.stopPropagation();
+      toggleSeason(season, null);
+    });
+  }
+});
+
+document.getElementById('chk-all').addEventListener('change', (e) => {
+  e.stopPropagation();
+  toggleAllSeasons();
+});
 
 // ─── INIT ────────────────────────────────────────────────────────────────────
 buildCountGrid();
