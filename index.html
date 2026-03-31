@@ -1069,13 +1069,15 @@ function drawZone() {
   ctx.strokeStyle = 'rgba(255,255,255,0.3)';
   ctx.lineWidth = 1.5; ctx.stroke();
 
-  // Batter hint
+  // Batter hint — switch side for LHH
+  const isLHH = currentPlayer && currentPlayer.bats === 'L';
   ctx.fillStyle = 'rgba(232,200,74,0.10)';
   ctx.beginPath();
-  ctx.ellipse(SZ.x - 20, SZ.y + SZ.h/2, 11, 26, 0, 0, Math.PI*2);
+  const batterX = isLHH ? SZ.x + SZ.w + 20 : SZ.x - 20;
+  ctx.ellipse(batterX, SZ.y + SZ.h/2, 11, 26, 0, 0, Math.PI*2);
   ctx.fill();
 
-  // Labels
+  // Labels — Inside/Outside flip for LHH
   ctx.fillStyle = 'rgba(90,106,122,0.7)';
   ctx.font = '8px Barlow, sans-serif';
   ctx.textAlign = 'center';
@@ -1083,12 +1085,15 @@ function drawZone() {
   ctx.fillText('CHASE UP', W/2, SZ.y - CZ*0.9);
   ctx.fillText('CHASE DOWN', W/2, SZ.y + SZ.h + CZ*0.9);
 
+  const leftLabel  = isLHH ? 'OUTSIDE' : 'INSIDE';
+  const rightLabel = isLHH ? 'INSIDE'  : 'OUTSIDE';
+
   ctx.save();
   ctx.translate(SZ.x - CZ*0.75, SZ.y + SZ.h/2);
-  ctx.rotate(-Math.PI/2); ctx.fillText('INSIDE', 0, 0); ctx.restore();
+  ctx.rotate(-Math.PI/2); ctx.fillText(leftLabel, 0, 0); ctx.restore();
   ctx.save();
   ctx.translate(SZ.x + SZ.w + CZ*0.75, SZ.y + SZ.h/2);
-  ctx.rotate(Math.PI/2); ctx.fillText('OUTSIDE', 0, 0); ctx.restore();
+  ctx.rotate(Math.PI/2); ctx.fillText(rightLabel, 0, 0); ctx.restore();
 }
 
 // ─── HOVER ───────────────────────────────────────────────────────────────────
