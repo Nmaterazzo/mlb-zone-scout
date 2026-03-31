@@ -997,6 +997,16 @@ function blendColors(c1, c2, t) {
 
 function drawZone() {
   ctx.clearRect(0, 0, W, H);
+
+  const isLHH = currentPlayer && currentPlayer.bats === 'L';
+
+  // For LHH mirror the entire canvas horizontally so inside/outside is correct
+  if (isLHH) {
+    ctx.save();
+    ctx.translate(W, 0);
+    ctx.scale(-1, 1);
+  }
+
   if (!Object.keys(zoneData).length) {
     ctx.fillStyle = '#1e2a38';
     ctx.fillRect(SZ.x, SZ.y, SZ.w, SZ.h);
@@ -1004,6 +1014,7 @@ function drawZone() {
     ctx.font = '12px Barlow, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('Load a player to begin', W/2, H/2);
+    if (isLHH) ctx.restore();
     return;
   }
 
@@ -1039,18 +1050,30 @@ function drawZone() {
       else if (currentMetric === 'slg') fmt = val.toFixed(3);
       else if (currentMetric === 'whiff') fmt = (val*100).toFixed(0)+'%';
       else fmt = val.toFixed(3);
+
+      const cx = rect.x + rect.w/2;
+      const cy = rect.y + rect.h/2;
+
+      ctx.save();
+      if (isLHH) {
+        // Un-mirror text so it reads correctly
+        ctx.translate(cx, cy);
+        ctx.scale(-1, 1);
+        ctx.translate(-cx, -cy);
+      }
       ctx.fillStyle = 'rgba(255,255,255,0.92)';
       ctx.font = 'bold 13px "Barlow Condensed", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(fmt, rect.x + rect.w/2, rect.y + rect.h/2);
+      ctx.fillText(fmt, cx, cy);
 
       // Sample size warning
       if (d.pitches < 10) {
         ctx.fillStyle = 'rgba(255,200,74,0.6)';
         ctx.font = '8px Barlow, sans-serif';
-        ctx.fillText(`n=${d.pitches}`, rect.x + rect.w/2, rect.y + rect.h/2 + 11);
+        ctx.fillText(`n=${d.pitches}`, cx, cy + 11);
       }
+      ctx.restore();
     }
   });
 
@@ -1069,15 +1092,13 @@ function drawZone() {
   ctx.strokeStyle = 'rgba(255,255,255,0.3)';
   ctx.lineWidth = 1.5; ctx.stroke();
 
-  // Batter hint — switch side for LHH
-  const isLHH = currentPlayer && currentPlayer.bats === 'L';
+  // Batter hint — always left side; mirror handles LHH
   ctx.fillStyle = 'rgba(232,200,74,0.10)';
   ctx.beginPath();
-  const batterX = isLHH ? SZ.x + SZ.w + 20 : SZ.x - 20;
-  ctx.ellipse(batterX, SZ.y + SZ.h/2, 11, 26, 0, 0, Math.PI*2);
+  ctx.ellipse(SZ.x - 20, SZ.y + SZ.h/2, 11, 26, 0, 0, Math.PI*2);
   ctx.fill();
 
-  // Labels — Inside/Outside flip for LHH
+  // Labels — always INSIDE left, OUTSIDE right; mirror handles LHH
   ctx.fillStyle = 'rgba(90,106,122,0.7)';
   ctx.font = '8px Barlow, sans-serif';
   ctx.textAlign = 'center';
@@ -1085,15 +1106,15 @@ function drawZone() {
   ctx.fillText('CHASE UP', W/2, SZ.y - CZ*0.9);
   ctx.fillText('CHASE DOWN', W/2, SZ.y + SZ.h + CZ*0.9);
 
-  const leftLabel  = isLHH ? 'OUTSIDE' : 'INSIDE';
-  const rightLabel = isLHH ? 'INSIDE'  : 'OUTSIDE';
-
   ctx.save();
   ctx.translate(SZ.x - CZ*0.75, SZ.y + SZ.h/2);
-  ctx.rotate(-Math.PI/2); ctx.fillText(leftLabel, 0, 0); ctx.restore();
+  ctx.rotate(-Math.PI/2); ctx.fillText('INSIDE', 0, 0); ctx.restore();
   ctx.save();
   ctx.translate(SZ.x + SZ.w + CZ*0.75, SZ.y + SZ.h/2);
-  ctx.rotate(Math.PI/2); ctx.fillText(rightLabel, 0, 0); ctx.restore();
+  ctx.rotate(Math.PI/2); ctx.fillText('OUTSIDE', 0, 0); ctx.restore();
+
+  // Restore mirror transform for LHH
+  if (isLHH) ctx.restore();
 }
 
 // ─── HOVER ───────────────────────────────────────────────────────────────────
